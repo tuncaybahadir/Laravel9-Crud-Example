@@ -16,6 +16,18 @@ class Person extends Model
         'gender'
     ];
 
+    protected $appends = [
+        'gender_read'
+    ];
+
+    /**
+     * @return string
+     */
+    public function getGenderReadAttribute()
+    {
+        return genderStatus($this->gender);
+    }
+
     /**
      * @return Attribute
      */
@@ -29,10 +41,30 @@ class Person extends Model
     /**
      * @return Attribute
      */
+    protected function birthdate(): Attribute
+    {
+        return Attribute::make(
+            get: static fn($value) => date('d/m/Y', strtotime($value)),
+            set: static fn ($value) => date('Y-m-d', strtotime($value)),
+        );
+    }
+
+    /**
+     * @return Attribute
+     */
     protected function createdAt(): Attribute
     {
         return Attribute::make(
             get: static fn ($value) => date('d.m.Y H:i', strtotime($value)),
         );
+    }
+
+
+    /**
+     * @return object
+     */
+    public function address(): object
+    {
+        return $this->hasOne(Address::class);
     }
 }
