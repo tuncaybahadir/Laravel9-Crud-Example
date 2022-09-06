@@ -7,6 +7,7 @@ use App\Http\Requests\Update\UpdatePersonRequest;
 use App\Models\Address;
 use App\Models\Person;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -144,9 +145,9 @@ class PersonController extends Controller
      * Remove the specified resource from storage.
      *
      * @param Person $person
-     * @return RedirectResponse
+     * @return JsonResponse
      */
-    public function destroy(Person $person): RedirectResponse
+    public function destroy(Person $person): JsonResponse
     {
 
         DB::beginTransaction();
@@ -159,24 +160,16 @@ class PersonController extends Controller
 
             DB::commit();
 
-            $responseMessage = [
-                'success',
-                'Kayıt başarılı bir şekilde silindi.'
-            ];
+            $state = 1;
 
         } catch (\Exception $e) {
 
             DB::rollBack();
 
-            $responseMessage = [
-                'error',
-                'Kayıt silinirken hata oluştu !'
-            ];
+            $state = 0;
 
         }
 
-
-        return to_route('person.index')
-            ->with('toastr', $responseMessage);
+        return response()->json($state);
     }
 }
