@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Store\StorePersonRequest;
 use App\Http\Requests\Update\UpdatePersonRequest;
+use App\Models\Address;
 use App\Models\Person;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PersonController extends Controller
@@ -19,22 +21,13 @@ class PersonController extends Controller
      */
     public function index(): View|Model|LengthAwarePaginator
     {
-            $data = Person::orderByDesc('id')
-                ->paginate(50);
+        $data = Person::with('address')
+            ->orderByDesc('id')
+            ->paginate(50);
 
-            return view('person.index', [
-                'data' => $data
-            ]);
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return View
-     */
-    public function create(): View
-    {
-        return view('person.create_edit');
+        return view('person.index', [
+            'data' => $data
+        ]);
     }
 
     /**
@@ -45,27 +38,48 @@ class PersonController extends Controller
      */
     public function store(StorePersonRequest $request): RedirectResponse
     {
-        Person::create($request->validated());
+        DB::beginTransaction();
+
+        try {
+
+            $validatedData = $request->validated();
+
+            $response = Person::create($request->validated());
+
+            Address::updateOrCreate(['person_id' => $response->id])
+                ->update($validatedData);
+
+            DB::commit();
+
+            $responseMessage = [
+                'success',
+                'Kayıt başarılı bir şekilde güncellendi.'
+            ];
+
+        } catch (\Exception $e) {
+
+            DB::rollBack();
+
+            $responseMessage = [
+                'error',
+                'Kayıt eklenirken hata oluştu !'
+            ];
+
+        }
 
         return to_route('person.index')
-            ->with('toastr',
-                [
-                    'success' ,
-                    'Yeni kayıt başarılı bir şekilde eklendi.'
-                ]
-            );
+            ->with('toastr', $responseMessage);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Show the form for creating a new resource.
      *
-     * @param Person $person
      * @return View
      */
-    public function edit(Person $person): View
+    public function create(): View
     {
         return view('person.create_edit', [
-            'data'  => $person
+            'genderStates' => genderStatus()
         ]);
     }
 
@@ -74,19 +88,56 @@ class PersonController extends Controller
      *
      * @param UpdatePersonRequest $request
      * @param Person $person
-     * @return RedirectResponse
+     * @return RedirectResponse|Model
      */
-    public function update(UpdatePersonRequest $request, Person $person): RedirectResponse
+    public function update(UpdatePersonRequest $request, Person $person): RedirectResponse|Model
     {
-        $person->update($request->validated());
+        DB::beginTransaction();
+
+        try {
+
+            $validatedData = $request->validated();
+
+            $person->update($validatedData);
+            $person->address()
+                ->updateOrCreate(['person_id' => $person->id],
+                    $request->validated()
+                );
+
+            DB::commit();
+
+            $responseMessage = [
+                'success',
+                'Kayıt başarılı bir şekilde güncellendi.'
+            ];
+
+        } catch (\Exception $e) {
+
+            DB::rollBack();
+
+            $responseMessage = [
+                'error',
+                'Kayıt güncellenirken hata oluştu !'
+            ];
+
+        }
 
         return to_route('person.edit', $person->id)
-            ->with('toastr',
-                [
-                    'success' ,
-                    'Kayıt başarılı bir şekilde güncellendi.'
-                ]
-            );
+            ->with('toastr', $responseMessage);
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param Person $person
+     * @return View|Model
+     */
+    public function edit(Person $person): View|Model
+    {
+        return view('person.create_edit', [
+            'genderStates' => genderStatus(),
+            'data' => $person
+        ]);
     }
 
     /**
@@ -97,23 +148,35 @@ class PersonController extends Controller
      */
     public function destroy(Person $person): RedirectResponse
     {
-        $deleteStatus = $person->delete();
 
-        $responseMessage = [];
+        DB::beginTransaction();
 
-        if ($deleteStatus === 1) {
+        try {
+
+            $person->address()->delete();
+
+            $person->delete();
+
+            DB::commit();
+
             $responseMessage = [
-                'success' ,
-                'Kayıt başarılı bir şekilde güncellendi.'
+                'success',
+                'Kayıt başarılı bir şekilde silindi.'
             ];
-        } else {
+
+        } catch (\Exception $e) {
+
+            DB::rollBack();
+
             $responseMessage = [
-                'error' ,
+                'error',
                 'Kayıt silinirken hata oluştu !'
             ];
+
         }
 
-        return to_route('person.edit', $person->id)
+
+        return to_route('person.index')
             ->with('toastr', $responseMessage);
     }
 }
