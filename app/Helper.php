@@ -27,3 +27,20 @@ if (!function_exists('tr_ucfirst_all')) {
     }
 
 }
+
+
+if (!function_exists('genderStatus')) {
+
+    function genderStatus($state = null): array|string
+    {
+
+        $data = [
+            'Erkek',
+            'Kadın'
+        ];
+
+        return $data[$state] ?? $data;
+
+    }
+
+}
